@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>#03 BIOGEOMETRIE | FULL BODY</title>
+    <style>
+        html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: sans-serif; }
+        #canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2; }
+        #ui { position: fixed; top: 25px; left: 50%; transform: translateX(-50%); z-index: 10; color: #0ff; font-size: 9px; letter-spacing: 3px; pointer-events: none; }
+
+        #splash {
+            position: fixed; inset: 0; display: flex; flex-direction: column;
+            align-items: center; justify-content: center; z-index: 9999;
+            background: #000; color: white; text-align: center;
+        }
+        #startApp {
+            margin-top: 30px; padding: 15px 35px; border: 1px solid #999;
+            background: transparent; color: #fff; cursor: pointer; letter-spacing: 5px; text-transform: uppercase;
+        }
+        #startApp:hover { border-color: #0ff; color: #0ff; }
+        .version-tag { margin-top: 25px; font-size: 0.7em; opacity: 0.5; letter-spacing: 4px; }
+    </style>
+</head>
+<body>
+
+    <div id="splash">
+        <div style="letter-spacing:4px;font-size:0.7em;opacity:0.6;">STAZIONE 03 | CORPO=ARCHITETTURA</div>
+        <h1 style="letter-spacing: 15px; font-weight: 100;">BIOGEOMETRIE</h1>
+        <button id="startApp">Avvia Mappatura Totale</button>
+        <div class="version-tag">BY DIEGO CAPANI</div>
+    </div>
+
+    <div id="ui">FULL BODY // ALGORITHMIC MAPPING</div>
+    <video id="input_video" style="display:none;" playsinline></video>
+
+    <script type="module">
+        import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
+        import * as THREE from "https://cdn.skypack.dev/three@0.136.0";
+
+        let poseLandmarker;
+        const video = document.getElementById("input_video");
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
+        const renderer = new THREE.WebGLRenderer({ alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.body.appendChild(renderer.domElement);
+
+        camera.position.z = 3;
+        const material = new THREE.LineBasicMaterial({ color: 0x00ffff });
+        const pointsGeometry = new THREE.BufferGeometry();
+        const skeleton = new THREE.LineSegments(pointsGeometry, material);
+        scene.add(skeleton);
+
+        async function startExperience() {
+            document.getElementById('splash').style.display = 'none';
+            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
+            poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
+                baseOptions: { modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task` },
+                runningMode: "VIDEO"
+            });
+
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+            video.play();
+            render();
+        }
+
+        function render() {
+            const results = poseLandmarker.detectForVideo(video, performance.now());
+            if (results.landmarks.length > 0) {
+                const points = [];
+                results.landmarks[0].forEach(l => {
+                    // Mappatura coordinate (invertendo Y e normalizzando)
+                    points.push(new THREE.Vector3((l.x - 0.5) * 4, -(l.y - 0.5) * 4, -l.z * 2));
+                });
+                pointsGeometry.setFromPoints(points);
+            }
+            renderer.render(scene, camera);
+            requestAnimationFrame(render);
+        }
+
+        document.getElementById('startApp').addEventListener('click', startExperience);
+    </script>
+</body>
+</html>
