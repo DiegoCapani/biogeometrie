@@ -2,71 +2,29 @@
 <html lang="it">
 <head>
     <meta charset="UTF-8">
-    <title>#03 BIOGEOMETRIE | MASK</title>
+    <title>BIOGEOMETRIE // INIT</title>
     <style>
-        body { margin: 0; background: #000; overflow: hidden; }
-        #splash { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: #fff; z-index: 999; cursor: pointer; }
-        canvas { display: block; }
+        body { margin: 0; background: #000; color: #0ff; font-family: monospace; }
+        #splash { 
+            position: fixed; inset: 0; display: flex; 
+            align-items: center; justify-content: center; 
+            background: #000; z-index: 9999; cursor: pointer;
+            border: 1px solid #0ff;
+        }
     </style>
 </head>
 <body>
 
-    <div id="splash"><h1>TOCCA PER INIZIARE</h1></div>
-    <video id="video" style="display:none" playsinline></video>
+    <div id="splash" onclick="startApp()">
+        <h1>TOCCA PER INIZIARE</h1>
+    </div>
 
-    <script type="module">
-        import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
-        import { FaceLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
-
-        let faceLandmarker, scene, camera, renderer, points;
-
-        async function init() {
+    <script>
+        function startApp() {
             document.getElementById('splash').style.display = 'none';
-
-            // 1. Three.js
-            scene = new THREE.Scene();
-            camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
-            camera.position.z = 1.5;
-            renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
-            renderer.setSize(window.innerWidth, window.innerHeight);
-            document.body.appendChild(renderer.domElement);
-
-            // 2. Geometria (468 punti)
-            const geometry = new THREE.BufferGeometry();
-            const material = new THREE.PointsMaterial({ color: 0x00ffff, size: 0.008 });
-            points = new THREE.Points(geometry, material);
-            scene.add(points);
-
-            // 3. MediaPipe
-            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
-            faceLandmarker = await FaceLandmarker.createFromOptions(vision, {
-                baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task" },
-                runningMode: "VIDEO"
-            });
-
-            const video = document.getElementById('video');
-            video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.play();
-
-            render();
+            console.log("App avviata correttamente");
+            alert("Il codice sta girando. Se vedi questo messaggio, il problema non è il JS, ma la webcam.");
         }
-
-        function render() {
-            const video = document.getElementById('video');
-            if (video.readyState >= 2) {
-                const results = faceLandmarker.detectForVideo(video, performance.now());
-                if (results.faceLandmarks.length > 0) {
-                    const landmarks = results.faceLandmarks[0];
-                    const pos = new Float32Array(landmarks.flatMap(l => [(l.x-0.5)*-2, (l.y-0.5)*-2, l.z]));
-                    points.geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
-                    points.geometry.attributes.position.needsUpdate = true;
-                }
-            }
-            renderer.render(scene, camera);
-            requestAnimationFrame(render);
-        }
-
-        document.getElementById('splash').addEventListener('click', init);
     </script>
 </body>
 </html>
