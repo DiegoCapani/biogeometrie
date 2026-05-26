@@ -7,8 +7,10 @@
 
     <style>
         html, body { margin: 0; padding: 0; overflow: hidden; background: #000; font-family: sans-serif; }
-        canvas { position: fixed; inset: 0; z-index: 2; pointer-events: none; }
         
+        #canvas { position: fixed; inset: 0; width: 100vw; height: 100vh; z-index: 2; background: transparent; }
+        
+        /* UI E SPLASH SCREEN */
         #ui { position: fixed; top: 25px; left: 50%; transform: translateX(-50%); z-index: 10; padding: 10px; color: #0ff; font-size: 9px; letter-spacing: 3px; pointer-events: none; }
 
         #splash {
@@ -21,13 +23,14 @@
             background: transparent; color: #fff; cursor: pointer; border-radius: 0; letter-spacing: 5px; text-transform: uppercase;
         }
         #startApp:hover { border-color: #0ff; color: #0ff; }
+        
         .version-tag { margin-top: 25px; font-size: 0.7em; opacity: 0.5; letter-spacing: 4px; }
     </style>
 </head>
 <body>
 
     <div id="splash">
-        <div style="letter-spacing:4px;font-size:0.7em;opacity:0.6;">STAZIONE 03 | CORPO=BIT</div>
+        <div style="letter-spacing:4px;font-size:0.7em;opacity:0.6;">STAZIONE 03 | CORPR=BIT</div>
         <h1 style="letter-spacing: 20px; font-weight: 100; margin-bottom: 5px;">BIOGEOMETRIE</h1>
         <div style="letter-spacing:4px;font-size:0.8em;opacity:0.6; margin-top: 10px; padding: 12px 18px;">Trasformazione algoritmica del volto in tempo reale</div>
         <button id="startApp">Tocca per avviare la Fotocamera</button>
@@ -54,12 +57,11 @@
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // Usa Points per vedere i 468 punti del volto chiaramente
             const geometry = new THREE.BufferGeometry();
-            const material = new THREE.PointsMaterial({ color: 0x00ffff, size: 0.005 });
-            const pointsMesh = new THREE.Points(geometry, material);
-            scene.add(pointsMesh);
-            camera.position.z = 0.5;
+            const material = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.8 });
+            const mesh = new THREE.LineSegments(geometry, material);
+            scene.add(mesh);
+            camera.position.z = 1.5;
 
             // MediaPipe Setup
             const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
@@ -74,22 +76,19 @@
             video.play();
 
             function render() {
-                // Controllo fondamentale per evitare il crash "ROI width"
-                if (video.readyState >= 2) {
-                    const results = faceLandmarker.detectForVideo(video, performance.now());
-                    if (results.faceLandmarks.length > 0) {
-                        const points = [];
-                        results.faceLandmarks[0].forEach(l => {
-                            // Mappatura corretta per il volto (x invertito per effetto specchio)
-                            points.push(new THREE.Vector3(-(l.x - 0.5), -(l.y - 0.5), -l.z));
-                        });
-                        geometry.setFromPoints(points);
-                    }
+                const results = faceLandmarker.detectForVideo(video, performance.now());
+                if (results.faceLandmarks.length > 0) {
+                    const points = [];
+                    // Estrazione landmark e normalizzazione
+                    results.faceLandmarks[0].forEach(l => {
+                        points.push(new THREE.Vector3(l.x * 2 - 1.2, -l.y * 2 + 1.2, -l.z * 5));
+                    });
+                    geometry.setFromPoints(points);
                 }
                 renderer.render(scene, camera);
                 requestAnimationFrame(render);
             }
-            render();
+            video.onloadeddata = render;
         }
 
         startBtn.addEventListener('click', startExperience);
