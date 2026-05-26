@@ -1,78 +1,74 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>#03 BIOGEOMETRIE | DEBUG</title>
+    <meta charset="UTF-8">
+    <title>BIOGEOMETRIE // DEBUG</title>
     <style>
-        body { margin: 0; background: #000; }
-        canvas { position: fixed; inset: 0; z-index: 2; }
-        #input_video { position: fixed; top: 0; left: 0; width: 200px; z-index: 1; opacity: 0.5; } /* Video debug piccolo */
-        #splash { position: fixed; inset: 0; z-index: 100; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #000; color: #fff; cursor: pointer; }
+        body { margin: 0; background: #000; color: #0ff; font-family: monospace; overflow: hidden; }
+        #canvas { position: fixed; inset: 0; z-index: 2; }
+        #log { position: fixed; top: 10px; left: 10px; z-index: 10; pointer-events: none; }
+        #splash { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; background: #000; cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div id="splash">
-        <h1>BIOGEOMETRIE</h1>
-        <p>TOCCA PER AVVIARE E VERIFICARE IL TRACKING</p>
-    </div>
-
-    <video id="input_video" playsinline></video>
+    <div id="log">AVVIA PER INIZIARE...</div>
+    <div id="splash"><h1>TOCCA PER AVVIARE</h1></div>
+    <video id="video" style="display:none" playsinline></video>
 
     <script type="module">
-        import * as THREE from 'https://cdn.skypack.dev/three@0.136.0';
         import { PoseLandmarker, FilesetResolver } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0";
+        import * as THREE from "https://cdn.skypack.dev/three@0.136.0";
 
-        const video = document.getElementById("input_video");
-        let poseLandmarker, pointsGeometry, pointsMesh;
+        const log = document.getElementById('log');
+        const splash = document.getElementById('splash');
+        
+        async function run() {
+            splash.style.display = 'none';
+            log.innerText = "Caricamento AI...";
 
-        async function start() {
-            document.getElementById('splash').style.display = 'none';
-            
-            // Setup Three.js
+            // 1. Setup Three.js
             const scene = new THREE.Scene();
             const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
-            camera.position.z = 5; // Allontaniamo la camera per vedere meglio tutto il corpo
-            
+            camera.position.z = 2;
             const renderer = new THREE.WebGLRenderer({ alpha: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             document.body.appendChild(renderer.domElement);
 
-            // Geometria
-            pointsGeometry = new THREE.BufferGeometry();
-            const material = new THREE.PointsMaterial({ color: 0x00ffff, size: 0.2 });
-            pointsMesh = new THREE.Points(pointsGeometry, material);
-            scene.add(pointsMesh);
+            // 2. Setup MediaPipe
+            try {
+                const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
+                const pose = await PoseLandmarker.createFromOptions(vision, {
+                    baseOptions: { modelAssetPath: "https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task" },
+                    runningMode: "VIDEO"
+                });
 
-            // MediaPipe
-            const vision = await FilesetResolver.forVisionTasks("https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.0/wasm");
-            poseLandmarker = await PoseLandmarker.createFromOptions(vision, {
-                baseOptions: { modelAssetPath: `https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_lite/float16/1/pose_landmarker_lite.task` },
-                runningMode: "VIDEO"
-            });
+                const video = document.getElementById('video');
+                video.srcObject = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.play();
 
-            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-            video.srcObject = stream;
-            video.play();
+                const geometry = new THREE.BufferGeometry();
+                const material = new THREE.PointsMaterial({ color: 0xffffff, size: 0.1 });
+                const points = new THREE.Points(geometry, material);
+                scene.add(points);
 
-            function render() {
-                const results = poseLandmarker.detectForVideo(video, performance.now());
-                if (results.landmarks && results.landmarks.length > 0) {
-                    const pos = [];
-                    results.landmarks[0].forEach(l => {
-                        // Scaliamo in modo aggressivo per assicurarci di vedere i punti
-                        pos.push((l.x - 0.5) * 6, -(l.y - 0.5) * 6, 0); 
-                    });
-                    pointsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+                function loop() {
+                    const result = pose.detectForVideo(video, performance.now());
+                    if (result.landmarks.length > 0) {
+                        const pos = new Float32Array(result.landmarks[0].flatMap(l => [(l.x-0.5)*-2, (l.y-0.5)*-2, l.z]));
+                        geometry.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                        log.innerText = "Tracking attivo";
+                    }
+                    renderer.render(scene, camera);
+                    requestAnimationFrame(loop);
                 }
-                renderer.render(scene, camera);
-                requestAnimationFrame(render);
+                loop();
+            } catch (e) {
+                log.innerText = "ERRORE: " + e.message;
             }
-            render();
         }
 
-        document.getElementById('splash').addEventListener('click', start);
+        splash.onclick = run;
     </script>
 </body>
 </html>
